@@ -3,9 +3,9 @@
 
     Script to train NN for jet flavour identification purpose (b-, c- and light jets): training and evaluation with Keras
 
-    Run on GPU: THEANO_FLAGS=mode=FAST_RUN,device=gpu,floatX=float32 python btagging_nn.py
+    Run on GPU: THEANO_FLAGS=mode=FAST_RUN,device=gpu,floatX=float32 ./btagging_nn.py
 
-    Switch backend using: KERAS_BACKEND=tensorflow python btagging_nn.py
+    Switch backend using: KERAS_BACKEND=tensorflow ./btagging_nn.py
 
 '''
 

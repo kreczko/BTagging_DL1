@@ -64,23 +64,23 @@ The initial ROOT ntuple has to be stored in a subdirectory called `inputFiles/`
 
 For the **initial preprocessing of the data**, please execute:
 
-`python scripts/PrepareSamples.py '<path-to-input_ROOT-file>'`
+`./scripts/PrepareSamples.py '<path-to-input_ROOT-file>'`
 
 In case the HDF5-file has already been created for the ROOT-file in an earlier run and one just wants to e.g. use a different reference distribution for (eta, pT) reweighting, use '' as argument for '<input_ROOT-file>' to directly load the data frame from the HDF5-file and save time.
 
 
 _Example_:
 
-`python scripts/PrepareSamples.py "inputFiles/mc15_13TeV_V33full_Akt4EMTo_minibtag.root"`
+`./scripts/PrepareSamples.py "inputFiles/mc15_13TeV_V33full_Akt4EMTo_minibtag.root"`
 
 
-Then, to *train*, execute:
+Then, to **train**, execute:
 
-`python scripts/btagging_nn.py -i '<path-to-prepared_HDF5-file>'`
+`./scripts/btagging_nn.py -i '<path-to-prepared_HDF5-file>'`
 
 _Example_:
 
-`python scripts/btagging_nn.py "PreparedSample__bcujet_ntuple_TrainFrac80_pTmax300__flat_pT_reweighting.h5"`
+`./scripts/btagging_nn.py "PreparedSample__bcujet_ntuple_TrainFrac80_pTmax300__flat_pT_reweighting.h5"`
 
 
-More information on the implemented flags is available via the default argparse `--help` option, i.e. `python scripts/PrepareSamples.py --help` and `python scripts/btagging_nn.py --help`.
+More information on the implemented flags is available via the default argparse `--help` option, i.e. `./scripts/PrepareSamples.py --help` and `./scripts/btagging_nn.py --help`.

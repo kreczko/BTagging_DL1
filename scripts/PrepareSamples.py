@@ -189,7 +189,7 @@ def _run():
     data_dict.update(default_dict)
     with open('PreparedFiles/'+out_str+'__metadata.pkl', 'wb') as output_file:
         pickle.dump(data_dict, output_file)
-    print "done.\nType 'python btagging_nn.py' for training with Keras."
+    print "all done.\n"
 
 
 def _get_args():
