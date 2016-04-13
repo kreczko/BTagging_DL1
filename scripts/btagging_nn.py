@@ -123,7 +123,7 @@ def _run():
 
         # This code is only left in so I know how to use these functions if I ever have to use them
         # Callback: early stopping if loss does not decrease anymore after 10 epochs
-        early_stopping = EarlyStopping(monitor="val_loss", patience=1)
+        early_stopping = EarlyStopping(monitor="val_loss", patience=10)
         learning_rate_scheduler = LearningRateScheduler(lambda x: 0.1 / (1. + x))
 
         # Callback: model checkpoint
