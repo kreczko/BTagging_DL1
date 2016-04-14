@@ -257,7 +257,7 @@ def calculate_reweighting(reference_spectrum, bin_counts_b, bin_counts_c, bin_co
     return RW_factors_b, RW_factors_c, RW_factors_u, RW_factors_tau
 
 
-def add_reweighBranch(df, jet_list_training, data_dict, pid_dict):
+def add_reweighBranch(df, data_dict, pid_dict):
     """
     This function adds the training weights for each jet to the DataFrame.
     """
@@ -269,7 +269,7 @@ def add_reweighBranch(df, jet_list_training, data_dict, pid_dict):
     sLength = len(df.index)
     weights = np.ones(df.index[sLength-1]+1, dtype = np.float32) # list to store the weights from eta-pT reweighting
     # shrink the DataFrame
-    df_prime = df.loc[jet_list_training,[jet_eta_str, jet_pt_str,'label']]
+    df_prime = df.loc[:,[jet_eta_str, jet_pt_str,'label']]
     for eta_itr, eta_item in enumerate(data_dict['eta_bins']):
         if eta_itr is 0:
             continue

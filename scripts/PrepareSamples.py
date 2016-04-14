@@ -172,7 +172,7 @@ def _run():
         }
     if 'bcut' in args.input_file:
         data_dict.update({'RW_tau': RW_tau})
-    df_all = add_reweighBranch(df_all, jet_list_training, data_dict, label_dict)
+    df_all = add_reweighBranch(df_all, data_dict, label_dict)
     print 'done.\nGetting variables and calculating mean values...'
 
     # set default values:
