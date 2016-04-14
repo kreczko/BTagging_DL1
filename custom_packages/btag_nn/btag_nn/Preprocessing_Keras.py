@@ -16,32 +16,20 @@ import pandas as pd
 import json
 
 
-def info(nc, nf):
-    info.nb_classes = int(nc)
-    info.nb_features = int(nf)
-
-
-def transform_for_Keras(X_train, y_train, X_dev, y_dev, X_test, y_test, weight, nb_features, nb_classes):
+def transform_for_Keras(X_train, y_train, X_test, y_test, weights_training, nb_features, nb_classes):
     from keras.utils import np_utils
 
-    info(nb_classes, nb_features)
     y_train = np.ravel(y_train)
     y_test = np.ravel(y_test)
     X_train = X_train.reshape(X_train.shape[0], nb_features)
     X_test = X_test.reshape(X_test.shape[0], nb_features)
     X_train = X_train.astype("float32")
     X_test = X_test.astype("float32")
-    weight = weight.astype("float32")
+    weights_training = weights_training.astype("float32")
     # transforms label entries to int32 and array to binary class matrix:
     Y_train = np_utils.to_categorical(y_train, nb_classes)
     Y_test = np_utils.to_categorical(y_test, nb_classes)
-
-    y_dev = np.ravel(y_dev)
-    X_dev = X_dev.reshape(X_dev.shape[0], nb_features)
-    X_dev = X_dev.astype("float32")
-    Y_dev = np_utils.to_categorical(y_dev, nb_classes)
-    print("Set sizes:\nTraining set: ", len(X_train), "Development set: ", len(X_dev), "\nTesting set: ", len(X_test))
-    return X_train, Y_train, X_dev, Y_dev, X_test, Y_test, weight
+    return X_train, Y_train, X_test, Y_test, weights_training
 
 
 def load_btagging_data(inFile, validation_set):
@@ -51,13 +39,14 @@ def load_btagging_data(inFile, validation_set):
         print("Load stored numpy arrays...")
         X_train = pd.read_hdf("KerasFiles/input/Keras_input__"+inFile.split("/")[1].replace("PreparedSample__","").replace("_ntuple","").replace('.h5','_val%s.h5' % str(int(validation_set*100))),"X_train")
         y_train = pd.read_hdf("KerasFiles/input/Keras_input__"+inFile.split("/")[1].replace("PreparedSample__","").replace("_ntuple","").replace('.h5','_val%s.h5' % str(int(validation_set*100))),"y_train")
-        X_dev = pd.read_hdf("KerasFiles/input/Keras_input__"+inFile.split("/")[1].replace("PreparedSample__","").replace("_ntuple","").replace('.h5','_val%s.h5' % str(int(validation_set*100))),"X_dev")
-        y_dev = pd.read_hdf("KerasFiles/input/Keras_input__"+inFile.split("/")[1].replace("PreparedSample__","").replace("_ntuple","").replace('.h5','_val%s.h5' % str(int(validation_set*100))),"y_dev")
+        X_val = pd.read_hdf("KerasFiles/input/Keras_input__"+inFile.split("/")[1].replace("PreparedSample__","").replace("_ntuple","").replace('.h5','_val%s.h5' % str(int(validation_set*100))),"X_val")
+        y_val = pd.read_hdf("KerasFiles/input/Keras_input__"+inFile.split("/")[1].replace("PreparedSample__","").replace("_ntuple","").replace('.h5','_val%s.h5' % str(int(validation_set*100))),"y_val")
         X_test = pd.read_hdf("KerasFiles/input/Keras_input__"+inFile.split("/")[1].replace("PreparedSample__","").replace("_ntuple","").replace('.h5','_val%s.h5' % str(int(validation_set*100))),"X_test")
         y_test = pd.read_hdf("KerasFiles/input/Keras_input__"+inFile.split("/")[1].replace("PreparedSample__","").replace("_ntuple","").replace('.h5','_val%s.h5' % str(int(validation_set*100))),"y_test")
-        sample_weight = pd.read_hdf("KerasFiles/input/Keras_input__"+inFile.split("/")[1].replace("PreparedSample__","").replace("_ntuple","").replace('.h5','_val%s.h5' % str(int(validation_set*100))),"sample_weight")
+        sample_weight_training = pd.read_hdf("KerasFiles/input/Keras_input__"+inFile.split("/")[1].replace("PreparedSample__","").replace("_ntuple","").replace('.h5','_val%s.h5' % str(int(validation_set*100))),"sample_weight_training")
+        sample_weight_validation = pd.read_hdf("KerasFiles/input/Keras_input__"+inFile.split("/")[1].replace("PreparedSample__","").replace("_ntuple","").replace('.h5','_val%s.h5' % str(int(validation_set*100))),"sample_weight_validation")
         X_train = X_train.as_matrix()
-        X_dev = X_dev.as_matrix()
+        X_val = X_val.as_matrix()
         X_test = X_test.as_matrix()
         with open("KerasFiles/input/Keras_input__"+inFile.split("/")[1].replace("PreparedSample__","").replace("_ntuple","").replace(".h5","__metadata.json"),"r") as input_metadata_file:
             info_dict = json.load(input_metadata_file)
@@ -86,8 +75,6 @@ def load_btagging_data(inFile, validation_set):
         df = pd.read_hdf(inFile,"PreparedJet_dataframe")
 
         print("  done.\n  reduce data...")
-        # retrieve sample weights (1:1 mapping to the training samples)
-        sample_weight = df[weight_str].loc[jet_list_training]
         # reduce the DataFrame to the training variables
         feature_array = append_kinematic_variables([])
         intermediate_tagger_variables = append_input_variables([])
@@ -100,7 +87,7 @@ def load_btagging_data(inFile, validation_set):
             classes_array.append("jetflav_tau")
         input_array = [x for x in feature_array]
         input_array.append("label")
-        df = df.reindex_axis(input_array, axis=1)
+
 
         print("  done.\n  update labels, calculate normalization offset and scale and split data...")
         # adjusting some variable values (case specific)
@@ -119,24 +106,18 @@ def load_btagging_data(inFile, validation_set):
             label_dict_new.update({"tau": 3,})
         for flavor in label_dict_old.keys():
             print("  Set particle-ID "+str(label_dict_old.get(flavor))+" to label number "+str(label_dict_new.get(flavor)))
-            df.update(df["label"].replace(to_replace=label_dict_old.get(flavor), value=label_dict_new.get(flavor)), join = "left", overwrite = True) # relabel b-jets
+            df.update(df["label"].replace(to_replace=label_dict_old.get(flavor), value=label_dict_new.get(flavor)), join = "left", overwrite = True) # relabel jets
 
 
-        # calculating normalization offset and scale:
-        scale_pandas = {}
-        offset_pandas = {}
-        for column_name, column_series in df.iteritems():
-            offset_pandas.update({column_name: -column_series.mean()})
-            scale_pandas.update({column_name: 1./(column_series).std()})
         # split testing set into development and testing sets:
-        jet_list_testing, jet_list_development = np.split(jet_list_testing,[int(round(len(jet_list_testing)*(1.-validation_set)))])
+        jet_list_testing, jet_list_validation = np.split(jet_list_testing,[int(round(len(jet_list_testing)*(1.-validation_set)))])
         if not os.path.isfile("KerasFiles/input/Keras_input__"+inFile.split("/")[1].replace("PreparedSample__","").replace("_ntuple","").replace('.h5','_val%s__jet_lists.h5' % str(int(validation_set*100)))):
             print("  done.\n  Store jet lists to HDF5...")
             df__jet_list_training = pd.DataFrame(data=np.asarray(jet_list_training), columns=['jet_list_training'])
-            df__jet_list_development = pd.DataFrame(data=np.asarray(jet_list_development), columns=['jet_list_development'])
+            df__jet_list_validation = pd.DataFrame(data=np.asarray(jet_list_validation), columns=['jet_list_validation'])
             df__jet_list_testing = pd.DataFrame(data=np.asarray(jet_list_testing), columns=['jet_list_testing'])
             df__jet_list_training.to_hdf("KerasFiles/input/Keras_input__"+inFile.split("/")[1].replace("PreparedSample__","").replace("_ntuple","").replace('.h5','_val%s__jet_lists.h5' % str(int(validation_set*100))), key='PreparedJet__jet_list_training', mode='w')
-            df__jet_list_development.to_hdf("KerasFiles/input/Keras_input__"+inFile.split("/")[1].replace("PreparedSample__","").replace("_ntuple","").replace('.h5','_val%s__jet_lists.h5' % str(int(validation_set*100))), key='PreparedJet__jet_list_development', mode='a')
+            df__jet_list_validation.to_hdf("KerasFiles/input/Keras_input__"+inFile.split("/")[1].replace("PreparedSample__","").replace("_ntuple","").replace('.h5','_val%s__jet_lists.h5' % str(int(validation_set*100))), key='PreparedJet__jet_list_validation', mode='a')
             df__jet_list_testing.to_hdf("KerasFiles/input/Keras_input__"+inFile.split("/")[1].replace("PreparedSample__","").replace("_ntuple","").replace('.h5','_val%s__jet_lists.h5' % str(int(validation_set*100))), key='PreparedJet__jet_list_testing', mode='a')
 
         print("  done.\n  Restructure DataFrame: fill lists with keras inputs...")
@@ -144,13 +125,28 @@ def load_btagging_data(inFile, validation_set):
         nb_classes = len(classes_array)
         len__jet_list_training = len(jet_list_training)
         len__jet_list_testing = len(jet_list_testing)
-        len__jet_list_development = len(jet_list_development)
+        len__jet_list_validation = len(jet_list_validation)
+
+        # retrieve sample weights (1:1 mapping to the training or validation samples)
+        sample_weight_training = df[weight_str].loc[jet_list_training]
+        sample_weight_validation = df[weight_str].loc[jet_list_validation]
+        
+        # remove variables not used in training (like e.g. the event weights)
+        df = df.reindex_axis(input_array, axis=1)
+        
+        # calculating normalization offset and scale:
+        scale_pandas = {}
+        offset_pandas = {}
+        for column_name, column_series in df.iteritems():
+            offset_pandas.update({column_name: -column_series.mean()})
+            scale_pandas.update({column_name: 1./(column_series).std()})
+        
         info_dict = {
             "general_info":{
                 "nb_inputs": nb_features,
                 "nb_classes": nb_classes,
                 "nb_training": len__jet_list_training,
-                "nb_development": len__jet_list_development,
+                "nb_validation": len__jet_list_validation,
                 "nb_testing": len__jet_list_testing,
                 "percentage of test-set for validation-set": validation_set,
             "class_labels": ["u-jet","c-jet","b-jet"],
@@ -164,7 +160,7 @@ def load_btagging_data(inFile, validation_set):
         # construct actual Keras inputs:
         X_train = []
         X_test = []
-        X_dev = []
+        X_val = []
         # append input to python lists:
 
         # training
@@ -177,13 +173,13 @@ def load_btagging_data(inFile, validation_set):
         del df_train
 
         # development
-        print("    done.\n    Start iterating over ",len__jet_list_development," development set entries...")
-        df_dev = df.reindex_axis(feature_array, axis=1).loc[jet_list_development]
-        for row in df_dev.iterrows():
+        print("    done.\n    Start iterating over ",len__jet_list_validation," development set entries...")
+        df_val = df.reindex_axis(feature_array, axis=1).loc[jet_list_validation]
+        for row in df_val.iterrows():
             index, data = row
-            X_dev.append(data.tolist())
-        y_dev = df.reindex_axis(["label"], axis=1).loc[jet_list_development]["label"].tolist()
-        del df_dev
+            X_val.append(data.tolist())
+        y_val = df.reindex_axis(["label"], axis=1).loc[jet_list_validation]["label"].tolist()
+        del df_val
 
         # testing
         print("    done.\n    Start iterating over ",len__jet_list_testing," testing set entries...")
@@ -197,16 +193,16 @@ def load_btagging_data(inFile, validation_set):
         # convert lists into numpy arrays:
         X_train = np.asarray(X_train,dtype=np.float32)
         y_train = np.asarray(y_train,dtype=np.float32)
-        X_dev = np.asarray(X_dev,dtype=np.float32)
-        y_dev = np.asarray(y_dev,dtype=np.float32)
+        X_val = np.asarray(X_val,dtype=np.float32)
+        y_val = np.asarray(y_val,dtype=np.float32)
         X_test = np.asarray(X_test,dtype=np.float32)
         y_test = np.asarray(y_test,dtype=np.float32)
 
         for feature_itr, feature_item in enumerate(feature_array):
             X_train.T[feature_itr] = X_train.T[feature_itr] + offset_pandas.get(feature_item)
             X_train.T[feature_itr] = X_train.T[feature_itr] * scale_pandas.get(feature_item)
-            X_dev.T[feature_itr] = X_dev.T[feature_itr] + offset_pandas.get(feature_item)
-            X_dev.T[feature_itr] = X_dev.T[feature_itr] * scale_pandas.get(feature_item)
+            X_val.T[feature_itr] = X_val.T[feature_itr] + offset_pandas.get(feature_item)
+            X_val.T[feature_itr] = X_val.T[feature_itr] * scale_pandas.get(feature_item)
             X_test.T[feature_itr] = X_test.T[feature_itr] + offset_pandas.get(feature_item)
             X_test.T[feature_itr] = X_test.T[feature_itr] * scale_pandas.get(feature_item)
         if feature_item in metadata:
@@ -218,11 +214,12 @@ def load_btagging_data(inFile, validation_set):
         store = pd.HDFStore("KerasFiles/input/Keras_input__"+inFile.split("/")[1].replace("PreparedSample__","").replace("_ntuple","").replace('.h5','_val%s.h5' % str(int(validation_set*100))))
         store.put("X_train", pd.DataFrame(X_train))
         store.put("y_train", pd.DataFrame(y_train))
-        store.put("X_dev", pd.DataFrame(X_dev))
-        store.put("y_dev", pd.DataFrame(y_dev))
+        store.put("X_val", pd.DataFrame(X_val))
+        store.put("y_val", pd.DataFrame(y_val))
         store.put("X_test", pd.DataFrame(X_test))
         store.put("y_test", pd.DataFrame(y_test))
-        store.put("sample_weight", sample_weight)
+        store.put("sample_weight_training", sample_weight_training)
+        store.put("sample_weight_validation", sample_weight_validation)
         store.close()
 
         meta_info_file_str = "KerasFiles/input/Keras_input__"+inFile.split("/")[1].replace("PreparedSample__","").replace("_ntuple","").replace(".h5","__metadata.json")
@@ -230,10 +227,11 @@ def load_btagging_data(inFile, validation_set):
         with open(meta_info_file_str, "w") as meta_info_file:
             json.dump(info_dict, meta_info_file, indent=2, sort_keys=True)
         print("done.")
-    return (X_train, y_train), (X_dev, y_dev), (X_test, y_test), sample_weight.values, (nb_features, nb_classes)
+    return (X_train, y_train), (X_val, y_val), (X_test, y_test), (sample_weight_training.values, sample_weight_validation.values), (nb_features, nb_classes)
 
 
 def load_btagging_data_inclFewTestJets(inFile, few_testjets, validation_set):
+    print(inFile, few_testjets, validation_set)
     import time
     start_load_btagging_data = time.time()
     exist_check = False # ugly, yes, but works (might be replaced)
@@ -244,7 +242,7 @@ def load_btagging_data_inclFewTestJets(inFile, few_testjets, validation_set):
         y_train = pd.read_hdf("TestFiles/input/Keras_input_test__"+inFile.split("/")[1].replace("PreparedSample__","").replace("_ntuple",""),"y_train")
         X_test = pd.read_hdf("TestFiles/input/Keras_input_test__"+inFile.split("/")[1].replace("PreparedSample__","").replace("_ntuple",""),"X_test")
         y_test = pd.read_hdf("TestFiles/input/Keras_input_test__"+inFile.split("/")[1].replace("PreparedSample__","").replace("_ntuple",""),"y_test")
-        sample_weight = pd.read_hdf("TestFiles/input/Keras_input_test__"+inFile.split("/")[1].replace("PreparedSample__","").replace("_ntuple",""),"sample_weight")
+        sample_weight_training = pd.read_hdf("TestFiles/input/Keras_input_test__"+inFile.split("/")[1].replace("PreparedSample__","").replace("_ntuple",""),"sample_weight_training")
         X_train = X_train.as_matrix()
         X_test = X_test.as_matrix()
         with open("TestFiles/input/Keras_input_test__"+inFile.split("/")[1].replace("PreparedSample__","").replace("_ntuple","").replace(".h5","__metadata.json"),"r") as input_metadata_file:
@@ -257,13 +255,14 @@ def load_btagging_data_inclFewTestJets(inFile, few_testjets, validation_set):
         print("Load stored numpy arrays...")
         X_train = pd.read_hdf("KerasFiles/input/Keras_input__"+inFile.split("/")[1].replace("PreparedSample__","").replace("_ntuple","").replace('.h5','_val%s.h5' % str(int(validation_set*100))),"X_train")
         y_train = pd.read_hdf("KerasFiles/input/Keras_input__"+inFile.split("/")[1].replace("PreparedSample__","").replace("_ntuple","").replace('.h5','_val%s.h5' % str(int(validation_set*100))),"y_train")
-        X_dev = pd.read_hdf("KerasFiles/input/Keras_input__"+inFile.split("/")[1].replace("PreparedSample__","").replace("_ntuple","").replace('.h5','_val%s.h5' % str(int(validation_set*100))),"X_dev")
-        y_dev = pd.read_hdf("KerasFiles/input/Keras_input__"+inFile.split("/")[1].replace("PreparedSample__","").replace("_ntuple","").replace('.h5','_val%s.h5' % str(int(validation_set*100))),"y_dev")
+        X_val = pd.read_hdf("KerasFiles/input/Keras_input__"+inFile.split("/")[1].replace("PreparedSample__","").replace("_ntuple","").replace('.h5','_val%s.h5' % str(int(validation_set*100))),"X_val")
+        y_val = pd.read_hdf("KerasFiles/input/Keras_input__"+inFile.split("/")[1].replace("PreparedSample__","").replace("_ntuple","").replace('.h5','_val%s.h5' % str(int(validation_set*100))),"y_val")
         X_test = pd.read_hdf("KerasFiles/input/Keras_input__"+inFile.split("/")[1].replace("PreparedSample__","").replace("_ntuple","").replace('.h5','_val%s.h5' % str(int(validation_set*100))),"X_test")
         y_test = pd.read_hdf("KerasFiles/input/Keras_input__"+inFile.split("/")[1].replace("PreparedSample__","").replace("_ntuple","").replace('.h5','_val%s.h5' % str(int(validation_set*100))),"y_test")
-        sample_weight = pd.read_hdf("KerasFiles/input/Keras_input__"+inFile.split("/")[1].replace("PreparedSample__","").replace("_ntuple","").replace('.h5','_val%s.h5' % str(int(validation_set*100))),"sample_weight")
+        sample_weight_training = pd.read_hdf("KerasFiles/input/Keras_input__"+inFile.split("/")[1].replace("PreparedSample__","").replace("_ntuple","").replace('.h5','_val%s.h5' % str(int(validation_set*100))),"sample_weight_training")
+        sample_weight_validation = pd.read_hdf("KerasFiles/input/Keras_input__"+inFile.split("/")[1].replace("PreparedSample__","").replace("_ntuple","").replace('.h5','_val%s.h5' % str(int(validation_set*100))),"sample_weight_validation")
         X_train = X_train.as_matrix()
-        X_dev = X_dev.as_matrix()
+        X_val = X_val.as_matrix()
         X_test = X_test.as_matrix()
         with open("KerasFiles/input/Keras_input_"+inFile.split("/")[1].replace("PreparedSample__","").replace("_ntuple","").replace(".h5","__metadata.json"),"r") as input_metadata_file:
             info_dict = json.load(input_metadata_file)
@@ -294,8 +293,6 @@ def load_btagging_data_inclFewTestJets(inFile, few_testjets, validation_set):
         df = pd.read_hdf(inFile,"PreparedJet_dataframe")
 
         print("  done.\n  reduce data...")
-        # retrieve sample weights (1:1 mapping to the training samples)
-        sample_weight = df["weights_eta_pT"].loc[jet_list_training]
         # reduce the DataFrame to the training variables
         feature_array = append_kinematic_variables([])
         intermediate_tagger_variables = append_input_variables([])
@@ -308,7 +305,6 @@ def load_btagging_data_inclFewTestJets(inFile, few_testjets, validation_set):
             classes_array.append("jetflav_tau")
         input_array = [x for x in feature_array]
         input_array.append("label")
-        df = df.reindex_axis(input_array, axis=1)
 
         print("  done.\n  update labels, calculate normalization offset and scale and split data...")
         # adjusting some variable values (case specific)
@@ -328,25 +324,20 @@ def load_btagging_data_inclFewTestJets(inFile, few_testjets, validation_set):
         for flavor in label_dict_old.keys():
             print("    set particle-ID "+str(label_dict_old.get(flavor))+" to label number "+str(label_dict_new.get(flavor)))
             df.update(df["label"].replace(to_replace=label_dict_old.get(flavor), value=label_dict_new.get(flavor)), join = "left", overwrite = True) # relabel b-jets
-        # calculating normalization offset and scale:
-        scale_pandas = {}
-        offset_pandas = {}
-        for column_name, column_series in df.iteritems():
-            offset_pandas.update({column_name: -column_series.mean()})
-            scale_pandas.update({column_name: 1./(column_series).std()})
+
         # split testing set into development and testing sets:
         if few_testjets is not "0":
             jet_list_testing = jet_list_testing[:int(few_testjets)*2]
-            jet_list_testing, jet_list_development = np.split(jet_list_testing,[intint(few_testjets)])
+            jet_list_testing, jet_list_validation = np.split(jet_list_testing,[intint(few_testjets)])
         else:
-            jet_list_testing, jet_list_development = np.split(jet_list_testing,[int(round(len(jet_list_testing)*(1.-validation_set)))])
+            jet_list_testing, jet_list_validation = np.split(jet_list_testing,[int(round(len(jet_list_testing)*(1.-validation_set)))])
             if not os.path.isfile("KerasFiles/input/Keras_input__"+inFile.split("/")[1].replace("PreparedSample__","").replace("_ntuple","").replace('.h5','_val%s__jet_lists.h5' % str(int(validation_set*100)))):
                 print("    done.\n    Store jet lists to HDF5...")
                 df__jet_list_training = pd.DataFrame(data=np.asarray(jet_list_training), columns=['jet_list_training'])
-                df__jet_list_development = pd.DataFrame(data=np.asarray(jet_list_development), columns=['jet_list_development'])
+                df__jet_list_validation = pd.DataFrame(data=np.asarray(jet_list_validation), columns=['jet_list_validation'])
                 df__jet_list_testing = pd.DataFrame(data=np.asarray(jet_list_testing), columns=['jet_list_testing'])
                 df__jet_list_training.to_hdf("KerasFiles/input/Keras_input__"+inFile.split("/")[1].replace("PreparedSample__","").replace("_ntuple","").replace('.h5','_val%s__jet_lists.h5' % str(int(validation_set*100))), key='PreparedJet__jet_list_training', mode='w')
-                df__jet_list_development.to_hdf("KerasFiles/input/Keras_input__"+inFile.split("/")[1].replace("PreparedSample__","").replace("_ntuple","").replace('.h5','_val%s__jet_lists.h5' % str(int(validation_set*100))), key='PreparedJet__jet_list_development', mode='a')
+                df__jet_list_validation.to_hdf("KerasFiles/input/Keras_input__"+inFile.split("/")[1].replace("PreparedSample__","").replace("_ntuple","").replace('.h5','_val%s__jet_lists.h5' % str(int(validation_set*100))), key='PreparedJet__jet_list_validation', mode='a')
                 df__jet_list_testing.to_hdf("KerasFiles/input/Keras_input__"+inFile.split("/")[1].replace("PreparedSample__","").replace("_ntuple","").replace('.h5','_val%s__jet_lists.h5' % str(int(validation_set*100))), key='PreparedJet__jet_list_testing', mode='a')
 
         print("    done.\n  restructure DataFrame: fill lists with keras inputs...")
@@ -354,13 +345,28 @@ def load_btagging_data_inclFewTestJets(inFile, few_testjets, validation_set):
         nb_classes = len(classes_array)
         len__jet_list_training = len(jet_list_training)
         len__jet_list_testing = len(jet_list_testing)
-        len__jet_list_development = len(jet_list_development)
+        len__jet_list_validation = len(jet_list_validation)
+
+        # retrieve sample weights (1:1 mapping to the training or validation samples)
+        sample_weight_training = df[weight_str].loc[jet_list_training]
+        sample_weight_validation = df[weight_str].loc[jet_list_validation]
+
+        # remove variables not used in training (like e.g. the event weights)
+        df = df.reindex_axis(input_array, axis=1)
+        
+        # calculating normalization offset and scale:
+        scale_pandas = {}
+        offset_pandas = {}
+        for column_name, column_series in df.iteritems():
+            offset_pandas.update({column_name: -column_series.mean()})
+            scale_pandas.update({column_name: 1./(column_series).std()})
+
         info_dict = {
             "general_info":{
                 "nb_inputs": nb_features,
                 "nb_classes": nb_classes,
                 "nb_training": len__jet_list_training,
-                "nb_development": len__jet_list_development,
+                "nb_validation": len__jet_list_validation,
                 "nb_testing": len__jet_list_testing,
                 "percentage of test-set for validation-set": validation_set,
                 "class_labels": ["u-jet","c-jet","b-jet"],
@@ -374,7 +380,7 @@ def load_btagging_data_inclFewTestJets(inFile, few_testjets, validation_set):
         # construct actual Keras inputs:
         X_train = []
         X_test = []
-        X_dev = []
+        X_val = []
         # append input to python lists:
 
         # training
@@ -388,13 +394,13 @@ def load_btagging_data_inclFewTestJets(inFile, few_testjets, validation_set):
         del df_train
 
         # development
-        print("    done.\n    Start iterating over ",len__jet_list_development," development set entries...")
-        df_dev = df.reindex_axis(feature_array, axis=1).loc[jet_list_development]
-        for row in df_dev.iterrows():
+        print("    done.\n    Start iterating over ",len__jet_list_validation," development set entries...")
+        df_val = df.reindex_axis(feature_array, axis=1).loc[jet_list_validation]
+        for row in df_val.iterrows():
             index, data = row
-            X_dev.append(data.tolist())
-        y_dev = df.reindex_axis(["label"], axis=1).loc[jet_list_development]["label"].tolist()
-        del df_dev
+            X_val.append(data.tolist())
+        y_val = df.reindex_axis(["label"], axis=1).loc[jet_list_validation]["label"].tolist()
+        del df_val
 
         # testing
         print("    done.\n    Start iterating over ",len__jet_list_testing," testing set entries...")
@@ -408,8 +414,8 @@ def load_btagging_data_inclFewTestJets(inFile, few_testjets, validation_set):
         # convert lists into numpy arrays:
         X_train = np.asarray(X_train,dtype=np.float32)
         y_train = np.asarray(y_train,dtype=np.float32)
-        X_dev = np.asarray(X_dev,dtype=np.float32)
-        y_dev = np.asarray(y_dev,dtype=np.float32)
+        X_val = np.asarray(X_val,dtype=np.float32)
+        y_val = np.asarray(y_val,dtype=np.float32)
         X_test = np.asarray(X_test,dtype=np.float32)
         y_test = np.asarray(y_test,dtype=np.float32)
 
@@ -431,8 +437,8 @@ def load_btagging_data_inclFewTestJets(inFile, few_testjets, validation_set):
         for feature_itr, feature_item in enumerate(feature_array):
             X_train.T[feature_itr] = X_train.T[feature_itr] + offset_pandas.get(feature_item)
             X_train.T[feature_itr] = X_train.T[feature_itr] * scale_pandas.get(feature_item)
-            X_dev.T[feature_itr] = X_dev.T[feature_itr] + offset_pandas.get(feature_item)
-            X_dev.T[feature_itr] = X_dev.T[feature_itr] * scale_pandas.get(feature_item)
+            X_val.T[feature_itr] = X_val.T[feature_itr] + offset_pandas.get(feature_item)
+            X_val.T[feature_itr] = X_val.T[feature_itr] * scale_pandas.get(feature_item)
             X_test.T[feature_itr] = X_test.T[feature_itr] + offset_pandas.get(feature_item)
             X_test.T[feature_itr] = X_test.T[feature_itr] * scale_pandas.get(feature_item)
             if feature_item in metadata:
@@ -455,11 +461,12 @@ def load_btagging_data_inclFewTestJets(inFile, few_testjets, validation_set):
             store = pd.HDFStore("KerasFiles/input/Keras_input__"+inFile.split("/")[1].replace("PreparedSample__","").replace("_ntuple","").replace('.h5','_val%s.h5' % str(int(validation_set*100))))
         store.put("X_train", pd.DataFrame(X_train))
         store.put("y_train", pd.DataFrame(y_train))
-        store.put("X_dev", pd.DataFrame(X_dev))
-        store.put("y_dev", pd.DataFrame(y_dev))
+        store.put("X_val", pd.DataFrame(X_val))
+        store.put("y_val", pd.DataFrame(y_val))
         store.put("X_test", pd.DataFrame(X_test))
         store.put("y_test", pd.DataFrame(y_test))
-        store.put("sample_weight", sample_weight)
+        store.put("sample_weight_training", sample_weight_training)
+        store.put("sample_weight_validation", sample_weight_validation)
         store.close()
 
         if few_testjets is not "0":
@@ -475,9 +482,9 @@ def load_btagging_data_inclFewTestJets(inFile, few_testjets, validation_set):
     time_load_btagging_data = end_load_btagging_data - start_load_btagging_data
     print("time_load_btagging_data = ", time_load_btagging_data)
     if few_testjets is not "0":
-        return (X_train, y_train), (X_test, y_test), sample_weight.values, nb_features, nb_classes, time_load_btagging_data
+        return (X_train, y_train), (X_test, y_test), sample_weight_training.values, nb_features, nb_classes, time_load_btagging_data
     elif few_testjets is "0":
-        return (X_train, y_train), (X_dev, y_dev), (X_test, y_test), sample_weight.values, nb_features, nb_classes, time_load_btagging_data
+        return (X_train, y_train), (X_val, y_val), (X_test, y_test), (sample_weight_training.values, sample_weight_validation.values), nb_features, nb_classes, time_load_btagging_data
 
 
 
