@@ -1,6 +1,6 @@
 '''
 ---------------------------------------------------------------------------------------
-inputs for training with Keras
+Inputs for training with Keras
 
 Includes: Input variable names
           Event weight string

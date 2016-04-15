@@ -95,7 +95,7 @@ def _run():
             model = model_from_json(open(args.reload_nn[0]).read())
             model.load_weights(args.reload_nn[1])
 
-        out_str = subdir_name+part_from_inFile+"__trainBS"+str(batch_size)+"_nE"+str(nb_epoch)+"_s"+str(args.seed_nr)
+        out_str = subdir_name+part_from_inFile+"_"+backend._BACKEND+"__trainBS"+str(batch_size)+"_nE"+str(nb_epoch)+"_s"+str(args.seed_nr)
         if args.validation_split > 0.:
             out_str +="_XVal"+str(int(args.validation_split*100))+"_"
         else:
@@ -108,10 +108,10 @@ def _run():
             elif args.optimizer=="adamax":
                 model_optimizer=Adamax(clipnorm=args.clipnorm)
             print(args.objective, args.optimizer, model_optimizer)
-            model.compile(loss=args.objective, optimizer=model_optimizer)
+            model.compile(loss=args.objective, optimizer=model_optimizer, metrics=["accuracy"])
         else:
             print(args.objective, args.optimizer)
-            model.compile(loss=args.objective, optimizer=args.optimizer)
+            model.compile(loss=args.objective, optimizer=args.optimizer, metrics=["accuracy"])
 
         # Callback: early stopping if loss does not decrease anymore after 10 epochs
         early_stopping = EarlyStopping(monitor="val_loss", patience=10)
@@ -122,28 +122,42 @@ def _run():
         # Callback: model checkpoint
         model_check_point = ModelCheckpoint("KerasFiles/"+subdir_name+"/Keras_callback_ModelCheckpoint/weights_"+out_str+"__{epoch:02d}-{val_loss:.2f}-{val_acc:.2f}.hdf5", monitor="val_loss", verbose=1, save_best_only=True, mode="auto")
 
-        if backend._BACKEND is "tensorflow":
+        start_training = time.time()
+        if backend._BACKEND=="tensorflow":
             from keras.callbacks import TensorBoard
             os.system("mkdir -p ./KerasFiles/TensorFlow_logs/")
-            TensorBoard(log_dir='./KerasFiles/TensorFlow_logs', histogram_freq=2)
+            tensorboard = TensorBoard(log_dir='./KerasFiles/TensorFlow_logs', histogram_freq=1)
 
+            if args.validation_split==0.:
+                history = model.fit(X_train, Y_train,
+                                    batch_size=batch_size, nb_epoch=nb_epoch,
+                                    callbacks=[model_check_point, early_stopping, learning_rate_scheduler, tensorboard],
+                                    show_accuracy=True, verbose=1,
+                                    validation_data=(X_val, Y_val, sample_weights_validation),
+                                    sample_weight=sample_weights_training)
+            else:
+                history = model.fit(X_train, Y_train,
+                                    batch_size=batch_size, nb_epoch=nb_epoch,
+                                    callbacks=[model_check_point, early_stopping, learning_rate_scheduler, tensorboard],
+                                    show_accuracy=True, verbose=1,
+                                    validation_split=args.validation_split,
+                                    sample_weight=sample_weight_training)
+        else: # "theano":
+            if args.validation_split==0.:
+                history = model.fit(X_train, Y_train,
+                                    batch_size=batch_size, nb_epoch=nb_epoch,
+                                    callbacks=[model_check_point, early_stopping, learning_rate_scheduler],
+                                    show_accuracy=True, verbose=1,
+                                    validation_data=(X_val, Y_val, sample_weights_validation),
+                                    sample_weight=sample_weights_training)
+            else:
+                history = model.fit(X_train, Y_train,
+                                    batch_size=batch_size, nb_epoch=nb_epoch,
+                                    callbacks=[model_check_point, early_stopping, learning_rate_scheduler],
+                                    show_accuracy=True, verbose=1,
+                                    validation_split=args.validation_split,
+                                    sample_weight=sample_weight_training)
 
-        # REMARK: using the Keras split function on the training set to generate a validation set would upset the c-fraction in the training!
-        start_training = time.time()
-        if args.validation_split==0.:
-            history = model.fit(X_train, Y_train,
-                                batch_size=batch_size, nb_epoch=nb_epoch,
-                                callbacks=[model_check_point, early_stopping, learning_rate_scheduler],
-                                show_accuracy=True, verbose=1,
-                                validation_data=(X_val, Y_val, sample_weights_validation),
-                                sample_weight=sample_weights_training) # shuffle=True (default)
-        else:
-            history = model.fit(X_train, Y_train,
-                                batch_size=batch_size, nb_epoch=nb_epoch,
-                                callbacks=[model_check_point, early_stopping, learning_rate_scheduler],
-                                show_accuracy=True, verbose=1,
-                                validation_split=args.validation_split,
-                                sample_weight=sample_weight_training) # shuffle=True (default)
         # store history:
         history_filename = "KerasFiles/"+subdir_name+"/Keras_callback_ModelCheckpoint/hist__"+out_str+".h5"
         save_history(history, history_filename)

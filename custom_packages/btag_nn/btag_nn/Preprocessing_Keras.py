@@ -33,7 +33,7 @@ def transform_for_Keras(X_train, y_train, X_test, y_test, weights_training, nb_f
 
 
 def load_btagging_data(inFile, validation_set):
-    exist_check = False # ugly, yes, but works (might be replaced)
+    exist_check = False
     if os.path.isfile("KerasFiles/input/Keras_input__"+inFile.split("/")[1].replace("PreparedSample__","").replace("_ntuple","").replace('.h5','_val%s.h5' % str(int(validation_set*100)))):
         exist_check = True
         print("Load stored numpy arrays...")
@@ -130,17 +130,17 @@ def load_btagging_data(inFile, validation_set):
         # retrieve sample weights (1:1 mapping to the training or validation samples)
         sample_weight_training = df[weight_str].loc[jet_list_training]
         sample_weight_validation = df[weight_str].loc[jet_list_validation]
-        
+
         # remove variables not used in training (like e.g. the event weights)
         df = df.reindex_axis(input_array, axis=1)
-        
+
         # calculating normalization offset and scale:
         scale_pandas = {}
         offset_pandas = {}
         for column_name, column_series in df.iteritems():
             offset_pandas.update({column_name: -column_series.mean()})
             scale_pandas.update({column_name: 1./(column_series).std()})
-        
+
         info_dict = {
             "general_info":{
                 "nb_inputs": nb_features,
@@ -234,7 +234,7 @@ def load_btagging_data_inclFewTestJets(inFile, few_testjets, validation_set):
     print(inFile, few_testjets, validation_set)
     import time
     start_load_btagging_data = time.time()
-    exist_check = False # ugly, yes, but works (might be replaced)
+    exist_check = False
     if few_testjets is not "0" and os.path.isfile("TestFiles/input/Keras_input_test__"+inFile.split("/")[1].replace("PreparedSample__","").replace("_ntuple","")):
         exist_check = True
         print("Load stored numpy arrays of few test-jets...")
@@ -264,7 +264,7 @@ def load_btagging_data_inclFewTestJets(inFile, few_testjets, validation_set):
         X_train = X_train.as_matrix()
         X_val = X_val.as_matrix()
         X_test = X_test.as_matrix()
-        with open("KerasFiles/input/Keras_input_"+inFile.split("/")[1].replace("PreparedSample__","").replace("_ntuple","").replace(".h5","__metadata.json"),"r") as input_metadata_file:
+        with open("KerasFiles/input/Keras_input__"+inFile.split("/")[1].replace("PreparedSample__","").replace("_ntuple","").replace(".h5","__metadata.json"),"r") as input_metadata_file:
             info_dict = json.load(input_metadata_file)
         nb_features = info_dict["general_info"]["nb_inputs"]
         nb_classes = info_dict["general_info"]["nb_classes"]
@@ -353,7 +353,7 @@ def load_btagging_data_inclFewTestJets(inFile, few_testjets, validation_set):
 
         # remove variables not used in training (like e.g. the event weights)
         df = df.reindex_axis(input_array, axis=1)
-        
+
         # calculating normalization offset and scale:
         scale_pandas = {}
         offset_pandas = {}
