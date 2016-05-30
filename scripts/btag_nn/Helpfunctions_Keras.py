@@ -33,6 +33,4 @@ def save_history(hist, hist_filename):
     df_history['acc'] = pd.Series(np.asarray(hist.history.get("acc")), index=df_history.index)
     df_history['val_loss'] = pd.Series(np.asarray(hist.history.get("val_loss")), index=df_history.index)
     df_history['val_acc'] = pd.Series(np.asarray(hist.history.get("val_acc")), index=df_history.index)
-    df_history['batch'] = pd.Series(np.asarray(hist.history.get("batch")), index=df_history.index)
-    df_history['size'] = pd.Series(np.asarray(hist.history.get("size")), index=df_history.index)
     df_history.to_hdf(hist_filename, key='history', mode='w')
