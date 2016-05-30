@@ -2,22 +2,11 @@
 *.*~
 
 !/scripts
-/scripts/*.pyc
-/scripts/*.py~
+!/scripts/btag_nn/
 
-!/custom_packages
-/custom_packages/*
-!/custom_packages/btag_nn
-!/custom_packages/btag_nn_inputs
+/scripts/*.*
+!/scripts/*.py
 
-/custom_packages/btag_nn/*
-!/custom_packages/btag_nn/setup.py
-!/custom_packages/btag_nn/btag_nn/
-/custom_packages/btag_nn/btag_nn/*
-!/custom_packages/btag_nn/btag_nn/*.py
 
-/custom_packages/btag_nn_inputs/*
-!/custom_packages/btag_nn_inputs/setup.py
-!/custom_packages/btag_nn_inputs/btag_nn_inputs/
-/custom_packages/btag_nn_inputs/btag_nn_inputs/*
-!/custom_packages/btag_nn_inputs/btag_nn_inputs/*.py
+/scripts/btag_nn/*
+!/scripts/btag_nn/*.py
