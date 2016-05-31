@@ -28,7 +28,8 @@ def transform_for_Keras(X_train, y_train, X_test, y_test, weights_training, nb_f
 def load_btagging_data(inFile, validation_set):
     exists_already_check = False
     store_filename = "KerasFiles/input/Keras_input__"+inFile.split("/")[1].replace("PreparedSample__","").replace("_ntuple","").replace('.h5','_val%s.h5' % str(int(validation_set*100)))
-    if os.path.isfile("KerasFiles/input/Keras_input__"+inFile.split("/")[1].replace("PreparedSample__","").replace("_ntuple","").replace('.h5','_val%s.h5' % str(int(validation_set*100)))):
+    info_filename = "KerasFiles/input/Keras_input__"+inFile.split("/")[1].replace("PreparedSample__","").replace("_ntuple","").replace(".h5","__info.json")
+    if os.path.isfile(store_filename):
         exists_already_check = True
         print "Load stored numpy arrays..."
         X_train = pd.read_hdf(store_filename,"X_train")
@@ -42,7 +43,7 @@ def load_btagging_data(inFile, validation_set):
         X_train = X_train.as_matrix()
         X_val = X_val.as_matrix()
         X_test = X_test.as_matrix()
-        with open("KerasFiles/input/Keras_input__"+inFile.split("/")[1].replace("PreparedSample__","").replace("_ntuple","").replace(".h5","__info.json"),"r") as input_info_file:
+        with open(info_filename,"r") as input_info_file:
             info_dict = json.load(input_info_file)
         nb_features = info_dict.get("nb_inputs")
         nb_classes = info_dict.get("nb_classes")
@@ -191,7 +192,7 @@ def load_btagging_data(inFile, validation_set):
         store.put("sample_weights_validation", sample_weights_validation)
         store.close()
 
-        info_file_str = "KerasFiles/input/Keras_input__"+inFile.split("/")[1].replace("PreparedSample__","").replace("_ntuple","").replace(".h5","__info.json")
+        info_file_str = info_filename
 
         # add Keras version information:
         #############################################

@@ -73,7 +73,6 @@ def _run():
         os.system("mkdir -p KerasFiles/%s/Keras_output/" % (subdir_name))
         os.system("mkdir -p KerasFiles/%s/Keras_callback_ModelCheckpoint/" % (subdir_name))
     else:
-        # TODO: check if reloading works
         # reload nn configuration from previous training
         part_from_inFile = "RE__"+args.reload_nn[0].split(".json")[0].split("__")[2]+"__"+args.reload_nn[0].split(".json")[0].split("__")[3]
         subdir_name = args.reload_nn[0].split(".json")[0].split('/')[1]
